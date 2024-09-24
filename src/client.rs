@@ -20,6 +20,7 @@ pub fn start_client(config: &Config) {
             }
             Err(e) => {
                 error!("Error reading message: {}", e);
+                break;
             }
         }
     }
