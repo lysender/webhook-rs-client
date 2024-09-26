@@ -1,5 +1,5 @@
 use std::{
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
     net::TcpStream,
     thread,
     time::Duration,
@@ -36,7 +36,18 @@ fn connect(config: &Config) -> Result<()> {
     }
 }
 
-fn handle_connection(stream: TcpStream) -> Result<()> {
+fn handle_connection(mut stream: TcpStream) -> Result<()> {
+    info!("Authenticating to server...");
+
+    // Before reading incoming messages, send a message to the server first
+    let auth_msg = format!("WEBHOOK/1.0 AUTH\r\njwt_token");
+    let write_res = stream.write_all(auth_msg.as_bytes());
+
+    if let Err(write_err) = write_res {
+        let msg = format!("Authenticating to server failed: {}", write_err);
+        return Err(msg.into());
+    }
+
     let reader = BufReader::new(stream);
 
     for line in reader.lines() {
