@@ -13,7 +13,7 @@ pub fn start_client(config: &Config) {
     loop {
         let conn = connect(&config);
         if let Err(e) = conn {
-            error!("Error connecting to the server: {}", e);
+            error!("Connection error: {}", e);
             info!("Reconnecting in 10 seconds...");
 
             thread::sleep(Duration::from_secs(10));
@@ -22,9 +22,21 @@ pub fn start_client(config: &Config) {
 }
 
 fn connect(config: &Config) -> Result<()> {
-    let stream = TcpStream::connect(&config.server_address).unwrap();
-    info!("Connected to the server: {}", config.server_address);
+    let stream_res = TcpStream::connect(&config.server_address);
+    match stream_res {
+        Ok(stream) => {
+            info!("Connected to server...");
+            let _ = handle_connection(stream);
+            Ok(())
+        }
+        Err(e) => {
+            let connect_err = format!("Error connecting to the server: {}", e);
+            Err(connect_err.into())
+        }
+    }
+}
 
+fn handle_connection(stream: TcpStream) -> Result<()> {
     let reader = BufReader::new(stream);
 
     for line in reader.lines() {
@@ -33,8 +45,8 @@ fn connect(config: &Config) -> Result<()> {
                 info!("Received message: {}", message);
             }
             Err(e) => {
-                error!("Error reading message: {}", e);
-                return Err("Error reading message".into());
+                let msg_error = format!("Error reading message: {}", e);
+                return Err(msg_error.into());
             }
         }
     }
