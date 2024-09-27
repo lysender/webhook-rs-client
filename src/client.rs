@@ -26,7 +26,9 @@ fn connect(config: &Config) -> Result<()> {
     match stream_res {
         Ok(stream) => {
             info!("Connected to server...");
-            let _ = handle_connection(stream);
+            if let Err(conn_err) = handle_connection(stream) {
+                return Err(conn_err);
+            }
             Ok(())
         }
         Err(e) => {
@@ -40,7 +42,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
     info!("Authenticating to server...");
 
     // Before reading incoming messages, send a message to the server first
-    let auth_msg = format!("WEBHOOK/1.0 AUTH\r\njwt_token");
+    let auth_msg = format!("AUTH /auth WEBHOOK/1.0\r\nAuthorization: jwt_token\n");
     let write_res = stream.write_all(auth_msg.as_bytes());
 
     if let Err(write_err) = write_res {
@@ -54,6 +56,9 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
         match line {
             Ok(message) => {
                 info!("Received message: {}", message);
+                if let Err(auth_err) = handle_auth_response(message) {
+                    return Err(auth_err);
+                }
             }
             Err(e) => {
                 let msg_error = format!("Error reading message: {}", e);
@@ -63,4 +68,12 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn handle_auth_response(message: String) -> Result<()> {
+    match message.as_str() {
+        "WEBHOOK/1.0 200 OK" => Ok(()),
+        "WEBHOOK/1.0 401 Unauthorized" => Err("Authentication failed".into()),
+        _ => Ok(()),
+    }
 }
